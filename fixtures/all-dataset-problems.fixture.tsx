@@ -1,7 +1,7 @@
 import { GenericSolverDebugger } from "@tscircuit/solver-utils/react"
+import { datasetProblems } from "fixtures/dataset"
 import { HighDensityRepairSolver } from "lib/high-density-repair-solver"
 import { useState } from "react"
-import { datasetProblems } from "tests/fixtures/dataset"
 
 export default function AllDatasetProblemsFixture() {
   const [sampleNumberInput, setSampleNumberInput] = useState("1")

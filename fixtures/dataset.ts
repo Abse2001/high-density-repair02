@@ -1,5 +1,5 @@
 import * as dataset from "dataset-hd08"
-import type { DatasetSample } from "../../lib/high-density-repair-solver"
+import type { DatasetSample } from "../lib/high-density-repair-solver"
 
 const datasetRecord: Record<string, unknown> = dataset
 
