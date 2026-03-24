@@ -2,10 +2,11 @@ import { BaseSolver } from "@tscircuit/solver-utils"
 import type { GraphicsObject } from "graphics-debug"
 
 type XY = { x: number; y: number }
+type RoutePoint = XY & { z?: number }
 type PortPoint = XY & { connectionName?: string; portPointId?: string }
 type HdRoute = {
   connectionName?: string
-  route?: XY[]
+  route?: RoutePoint[]
   traceThickness?: number
   vias?: Array<{ x: number; y: number; diameter?: number }>
   viaDiameter?: number
@@ -30,6 +31,63 @@ export type DatasetSample = {
 
 export interface HighDensityRepairSolverParams {
   sample?: DatasetSample
+}
+
+const TOP_LAYER_COLOR = "#FF0000"
+const BOTTOM_LAYER_COLOR = "#0000FF"
+const DEFAULT_TRACE_THICKNESS = 0.15
+
+const getRoutePointLayer = (point?: RoutePoint): "top" | "bottom" =>
+  point?.z === 1 ? "bottom" : "top"
+
+const getRouteStrokeColor = (layer: "top" | "bottom") =>
+  layer === "bottom" ? BOTTOM_LAYER_COLOR : TOP_LAYER_COLOR
+
+const splitRouteIntoLayerSegments = (route: HdRoute) => {
+  const routePoints = route.route ?? []
+  const lines: Array<{
+    points: XY[]
+    strokeColor: string
+    strokeWidth: number
+    label: string
+  }> = []
+
+  if (routePoints.length < 2) return lines
+
+  let currentLayer = getRoutePointLayer(routePoints[0])
+  let currentSegment: XY[] = [routePoints[0]]
+
+  for (let index = 1; index < routePoints.length; index += 1) {
+    const point = routePoints[index]
+    const pointLayer = getRoutePointLayer(point)
+
+    if (pointLayer !== currentLayer) {
+      if (currentSegment.length >= 2) {
+        lines.push({
+          points: currentSegment,
+          strokeColor: getRouteStrokeColor(currentLayer),
+          strokeWidth: route.traceThickness ?? DEFAULT_TRACE_THICKNESS,
+          label: route.connectionName ?? "route",
+        })
+      }
+      currentLayer = pointLayer
+      currentSegment = [routePoints[index - 1], point]
+      continue
+    }
+
+    currentSegment.push(point)
+  }
+
+  if (currentSegment.length >= 2) {
+    lines.push({
+      points: currentSegment,
+      strokeColor: getRouteStrokeColor(currentLayer),
+      strokeWidth: route.traceThickness ?? DEFAULT_TRACE_THICKNESS,
+      label: route.connectionName ?? "route",
+    })
+  }
+
+  return lines
 }
 
 export class HighDensityRepairSolver extends BaseSolver {
@@ -92,18 +150,16 @@ export class HighDensityRepairSolver extends BaseSolver {
         .map((routePoint) => ({
           x: routePoint.x,
           y: routePoint.y,
-          color: "#0ea5e9",
+          color:
+            getRoutePointLayer(routePoint) === "bottom"
+              ? BOTTOM_LAYER_COLOR
+              : "#0ea5e9",
         })),
     ]
 
     const lines = routes
       .filter((route) => (route.route?.length ?? 0) >= 2)
-      .map((route) => ({
-        points: route.route as XY[],
-        strokeColor: "#0284c7",
-        strokeWidth: route.traceThickness ?? 0.15,
-        label: route.connectionName ?? "route",
-      }))
+      .flatMap((route) => splitRouteIntoLayerSegments(route))
 
     const circles = routes.flatMap((route) =>
       (route.vias ?? []).map((via) => ({
